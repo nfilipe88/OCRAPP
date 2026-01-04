@@ -51,3 +51,152 @@ Fazer Upload e Processar:
 Faz o upload do PDF novamente (ID 1).
 
 Corre o worker: python workers/ocr_worker.py.
+
+Com certeza! Chegámos a um marco muito importante. O sistema está funcional, robusto para documentos antigos e com o ciclo de aprendizagem completo.
+
+Aqui tens um conteúdo completo e profissional para o teu ficheiro `README.md`. Ele documenta como instalar, rodar e, o mais importante, **como funciona o ciclo de melhoria contínua** que desenvolvemos.
+
+Podes copiar e colar isto diretamente no ficheiro `ocr_platform/README.md`.
+
+---
+
+```markdown
+# 🇦🇴 OCR Inteligente - Registos de Angola
+
+Plataforma de digitalização e reconhecimento de texto manuscrito (OCR) focada em registos históricos e oficiais de Angola (Assentos de Nascimento, Óbito, etc.). O sistema utiliza Inteligência Artificial (TrOCR) com uma arquitetura "Human-in-the-loop", permitindo que o modelo aprenda e evolua com as correções dos operadores.
+
+## 🚀 Funcionalidades Principais
+
+* **Ingestão de Documentos:** Suporte a PDF e Imagens via API REST.
+* **Visão Computacional Avançada:** Algoritmos robustos para limpeza de documentos históricos (remoção de fundo, normalização, remoção de linhas de tabelas e correção de inclinação).
+* **OCR Manuscrito:** Utilização do modelo Microsoft TrOCR (Transformer-based OCR).
+* **Interface de Validação:** Painel para humanos visualizarem os segmentos recortados e corrigirem o texto.
+* **Aprendizagem Contínua:** Scripts para gerar datasets a partir das correções e re-treinar a IA automaticamente.
+
+---
+
+## 🛠️ Instalação e Configuração
+
+### 1. Pré-requisitos
+* Python 3.10 ou superior
+* Docker Desktop (para a base de dados PostgreSQL)
+* Git
+
+### 2. Configurar o Ambiente
+```bash
+# Entrar na pasta do projeto
+cd backend/ocr_platform
+
+# Criar ambiente virtual
+python -m venv .venv
+
+# Ativar ambiente (Windows)
+.venv\Scripts\activate
+
+# Instalar dependências
+pip install -r requirements.txt
+
+```
+
+### 3. Iniciar a Infraestrutura
+
+```bash
+# Levantar a Base de Dados (PostgreSQL)
+docker-compose up -d
+
+# Criar as tabelas na base de dados
+python init_db.py
+
+## ▶️ Como Executar
+
+O sistema é composto por três partes que funcionam em conjunto:
+
+### 1. Iniciar a API (Backend)
+
+Serve para receber ficheiros e fornecer dados à interface.
+
+```bash
+uvicorn app.main:app --reload
+
+```
+
+*Acesse a documentação da API em: https://www.google.com/search?q=http://127.0.0.1:8000/docs*
+para carregar documentos manuscritos via endpoint `POST /documents/upload`.
+
+### 2. Interface de Operador (Frontend)
+
+Basta abrir o ficheiro `frontend_test.html` no seu navegador. É aqui que verá os resultados e fará correções.
+
+### 3. Processar Documentos (Worker)
+
+Para processar os documentos pendentes ou testar um documento específico:
+
+```bash
+python workers/ocr_worker.py
+
+```
+
+---
+
+## 🔄 O Ciclo de Trabalho (Workflow)
+
+Este é o fluxo principal para ensinar a IA a ler os manuscritos de Angola:
+
+### Passo 1: Ingestão
+
+Envie um PDF (ex: `14F.pdf`) através da API (`POST /documents/upload`) ou coloque-o na pasta `uploads/`.
+
+### Passo 2: Processamento (OCR)
+
+Execute o `workers/ocr_worker.py`. O sistema irá:
+
+1. **Limpar a imagem:** Remover o fundo amarelado, linhas de pauta e margens pretas (`ml/preprocessing/image.py`).
+2. **Segmentar:** Recortar linha a linha.
+3. **Ler:** Usar o modelo de IA para prever o texto.
+
+### Passo 3: Validação Humana
+
+Abra o `frontend_test.html`.
+
+1. Veja a imagem recortada.
+2. Corrija o texto se a IA tiver errado.
+3. Clique em **"Validar"**. O texto correto é salvo na base de dados.
+
+### Passo 4: Re-Treino (Fine-Tuning)
+
+Quando tiver várias correções feitas, ensine a IA:
+
+1. **Gerar Pacote de Treino:**
+```bash
+python ml/training/build_dataset.py
+
+```
+
+
+*Isto cria a pasta `data/dataset_v1` com as imagens e o texto correto.*
+2. **Treinar o Modelo:**
+```bash
+python ml/training/train_trocr.py
+
+```
+
+
+*Isto cria um novo "cérebro" em `models/ocr/trocr_finetuned_v1`.*
+
+Na próxima vez que rodar o Worker, ele usará automaticamente o modelo novo e mais inteligente! 🧠
+
+---
+
+## 📂 Estrutura do Projeto
+
+* `app/`: Código da API (Rotas, Modelos de Base de Dados, Configurações).
+* `ml/`: Núcleo de Inteligência Artificial.
+* `preprocessing/`: Lógica de limpeza de imagem (OpenCV, Normalização).
+* `inference/`: Código que executa a leitura (Hugging Face Transformers).
+* `training/`: Scripts de treino e criação de datasets.
+
+
+* `workers/`: Scripts de processamento em segundo plano.
+* `segments/`: Pasta temporária com os recortes das linhas (gerado automaticamente).
+* `models/`: Onde os modelos treinados são guardados.
+

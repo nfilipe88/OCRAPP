@@ -1,3 +1,5 @@
 /.venv
 ocr_platform/uploads
 ocr_platform/segments
+ocr_platform/data
+ocr_platform/models

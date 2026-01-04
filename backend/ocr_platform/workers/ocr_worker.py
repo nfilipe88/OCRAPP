@@ -85,4 +85,6 @@ def process_document(document_id: int):
         db.close()
 
 if __name__ == "__main__":
-    process_document(1)
+    # Processar documentos 1, 2 e 3 de uma vez
+    for i in range(1, 4):
+         process_document(i)
