@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <title>Validação OCR - Angola</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 20px; background-color: #f0f2f5; }
+        h2 { color: #333; border-bottom: 2px solid #28a745; padding-bottom: 10px; }
+        
+        .segment-card { 
+            background: white; 
+            padding: 20px; 
+            margin-bottom: 20px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px;
+        }
+        
+        .image-container {
+            background-color: #fafafa;
+            border: 1px dashed #ccc;
+            padding: 10px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        
+        .segment-img { 
+            max-width: 100%; 
+            height: auto; 
+            max-height: 80px; /* Limita altura para não ocupar muito */
+        }
+
+        .controls { display: flex; gap: 10px; align-items: center; }
+        
+        input[type="text"] { 
+            flex-grow: 1; 
+            padding: 12px; 
+            font-size: 16px; 
+            border: 1px solid #ddd; 
+            border-radius: 6px; 
+            transition: border 0.3s;
+        }
+        input[type="text"]:focus { border-color: #28a745; outline: none; }
+
+        button { 
+            padding: 12px 20px; 
+            background-color: #28a745; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: #218838; }
+
+        .meta-info { font-size: 0.85em; color: #666; margin-bottom: 5px; }
+        .saved { border-left: 5px solid #28a745; }
+    </style>
+</head>
+<body>
+    <h2>✍️ Validação de Segmentos (Documento ID: 1)</h2>
+    <p>Abaixo estão as linhas que a IA leu. Por favor, corrige os erros.</p>
+    
+    <div id="container">A carregar dados...</div>
+
+    <script>
+        const API_URL = "http://127.0.0.1:8000";
+        const DOC_ID = 1; // ⚠️ Estamos a focar no Documento 1 por agora
+
+        async function loadSegments() {
+            try {
+                const response = await fetch(`${API_URL}/ocr/segments/${DOC_ID}`);
+                const segments = await response.json();
+                const container = document.getElementById("container");
+                container.innerHTML = "";
+
+                if (segments.length === 0) {
+                    container.innerHTML = "<p>Nenhum segmento encontrado. Já correu o OCR Worker?</p>";
+                    return;
+                }
+
+                segments.forEach(seg => {
+                    const div = document.createElement("div");
+                    div.className = "segment-card";
+                    
+                    // Tratamento do caminho da imagem para URL
+                    // O backend pode guardar "segments\abc.png" (Windows) ou "segments/abc.png"
+                    // Precisamos garantir que a URL final é "http://.../segments/abc.png"
+                    let cleanPath = seg.imagem_path.replace(/\\/g, "/"); // Troca barra invertida por normal
+                    const imgUrl = `${API_URL}/${cleanPath}`;
+
+                    div.innerHTML = `
+                        <div class="meta-info">Segmento #${seg.id} | Confiança IA: ${(seg.confidence * 100).toFixed(1)}%</div>
+                        <div class="image-container">
+                            <img src="${imgUrl}" class="segment-img" alt="Imagem do texto manuscrito" onerror="this.src=''; this.alt='Imagem não encontrada (verifique a pasta segments)'">
+                        </div>
+                        <div class="controls">
+                            <input type="text" id="input-${seg.id}" value="${seg.texto_previsto}">
+                            <button onclick="saveCorrection(${seg.id}, this)">✅ Validar</button>
+                        </div>
+                    `;
+                    container.appendChild(div);
+                });
+            } catch (error) {
+                document.getElementById("container").innerHTML = `<p style="color:red">Erro ao ligar à API: ${error.message}</p>`;
+            }
+        }
+
+        async function saveCorrection(id, btn) {
+            const texto = document.getElementById(`input-${id}`).value;
+            const originalText = btn.innerText;
+            
+            btn.innerText = "A guardar...";
+            btn.disabled = true;
+
+            try {
+                // Envia a correção para a API
+                await fetch(`${API_URL}/ocr/segments/${id}/correct?texto_corrigido=${encodeURIComponent(texto)}`, {
+                    method: "POST"
+                });
+                
+                // Feedback visual de sucesso
+                const card = btn.closest(".segment-card");
+                card.classList.add("saved");
+                btn.innerText = "Guardado!";
+                btn.style.backgroundColor = "#155724"; // Verde escuro
+                
+                // Restaura o botão após 2 segundos
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerText = "Atualizar";
+                }, 2000);
+
+            } catch (error) {
+                alert("Erro ao guardar!");
+                console.error(error);
+                btn.innerText = "Erro";
+                btn.disabled = false;
+            }
+        }
+
+        // Iniciar
+        loadSegments();
+    </script>
+</body>
+</html>

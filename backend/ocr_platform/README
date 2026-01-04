@@ -1,0 +1,53 @@
+ocr-platform/
+│
+├── app/
+│   ├── main.py              # Entry point FastAPI
+│   ├── core/
+│   │   ├── config.py        # Configurações (env)
+│   │   └── database.py      # Conexão PostgreSQL
+│   │
+│   ├── models/              # SQLAlchemy models
+│   │   ├── document.py
+│   │   └── base.py
+│   │
+│   ├── schemas/             # Pydantic schemas
+│   │   └── document.py
+│   │
+│   ├── routes/
+│   │   └── documents.py     # Upload e consulta
+│   │
+│   └── services/
+│       └── storage.py       # MinIO / filesystem
+│
+├── workers/                 # (Sprint 2)
+├── ml/                      # (Sprint 2+)
+│
+├── migrations/              # Alembic
+├── tests/
+│
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+└── README.md
+
+
+Como mudámos a forma como o sistema "vê", precisamos de processar o documento novamente do zero.
+
+Limpar a Base de Dados e Ficheiros (Recomendado):
+
+PowerShell
+
+docker-compose down -v
+docker-compose up -d
+# Apagar manualmente os ficheiros na pasta ocr_platform/segments
+python init_db.py
+Reiniciar a API:
+
+PowerShell
+
+uvicorn app.main:app --reload
+Fazer Upload e Processar:
+
+Faz o upload do PDF novamente (ID 1).
+
+Corre o worker: python workers/ocr_worker.py.
