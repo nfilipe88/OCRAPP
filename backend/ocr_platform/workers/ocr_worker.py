@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 
 # Adiciona o diretório raiz ao path
 sys.path.append(os.getcwd())
@@ -14,25 +15,29 @@ import uuid
 import cv2
 
 def process_document(document_id: int):
-    print(f"Iniciando processamento do documento {document_id}...")
+    print(f"▶️ A iniciar processamento do documento {document_id}...")
     db = SessionLocal()
     
     try:
-        # CORREÇÃO: Usar db.get() em vez de db.query().get() (Moderno)
         document = db.get(Document, document_id)
         
         if not document:
-            print("Documento não encontrado.")
+            print(f"❌ Documento {document_id} não encontrado.")
             return
 
-        print(f"A ler ficheiro: {document.storage_path}")
+        # Bloquear o documento (status 'processing') para ninguém mais mexer
+        document.status = "processing"
+        db.commit()
 
-        # 1. Pré-processamento (Agora suporta PDF!)
+        print(f"   📂 Ficheiro: {document.storage_path}")
+
+        # 1. Pré-processamento (Limpeza e Segmentação)
+        # O teu image.py já tem a limpeza de fundo e rotação automática
         image = preprocess_image(document.storage_path)
         lines = segment_lines(image)
-        print(f"Documento segmentado em {len(lines)} linhas.")
+        print(f"   ✂️ Documento segmentado em {len(lines)} linhas.")
 
-        # 2. Criar registo do resultado
+        # 2. Criar registo de OCR
         ocr_result = OCRResultado(
             document_id=document.id,
             texto_completo="",
@@ -43,18 +48,22 @@ def process_document(document_id: int):
         db.refresh(ocr_result)
 
         full_text = []
-        confidences = []
         
         os.makedirs("segments", exist_ok=True)
 
-        # 3. Processar cada linha
-        print("A iniciar inferência com TrOCR...")
+        # 3. Leitura com IA
+        print("   🧠 A ler linhas com TrOCR...")
         for i, line in enumerate(lines):
             try:
+                # O run_trocr agora já carrega o teu modelo fino automaticamente!
                 text = run_trocr(line)
-                full_text.append(text)
-                confidences.append(1) # Simulação
+                
+                if not text.strip():
+                    continue
 
+                full_text.append(text)
+
+                # Guardar o recorte para validação no frontend
                 seg_filename = f"segments/{document.id}_{i}_{uuid.uuid4().hex[:6]}.png"
                 cv2.imwrite(seg_filename, line)
 
@@ -62,29 +71,58 @@ def process_document(document_id: int):
                     ocr_resultado_id=ocr_result.id,
                     imagem_path=seg_filename,
                     texto_previsto=text,
-                    confidence=1
+                    confidence=1.0 
                 )
                 db.add(segment)
-                # print(f"Linha {i}: {text}") # Descomenta para ver em tempo real
                 
             except Exception as e:
-                print(f"Erro na linha {i}: {e}")
+                print(f"   ⚠️ Erro na linha {i}: {e}")
 
         # 4. Finalizar
         ocr_result.texto_completo = "\n".join(full_text)
-        ocr_result.confidence_global = sum(confidences) / len(confidences) if confidences else 0.0
+        ocr_result.confidence_global = 1.0
         
         document.status = "ocr_completed"
         db.commit()
-        print("Processamento concluído com sucesso! 🚀")
+        print(f"✅ Documento {document_id} concluído com sucesso!")
 
     except Exception as e:
-        print(f"Erro crítico ao processar: {e}")
+        print(f"❌ Erro crítico ao processar {document_id}: {e}")
+        # Marcar como erro para não ficar preso em 'processing' para sempre
+        try:
+            document.status = "error"
+            db.commit()
+        except:
+            pass
         db.rollback()
     finally:
         db.close()
 
+def start_worker():
+    print("👷 OCR Worker Automático iniciado! A aguardar documentos...")
+    print("   (Pressione Ctrl+C para parar)")
+    
+    while True:
+        db = SessionLocal()
+        try:
+            # Procura o documento mais antigo que ainda esteja como 'uploaded'
+            pending_doc = db.query(Document)\
+                .filter(Document.status == "uploaded")\
+                .order_by(Document.created_at.asc())\
+                .first()
+
+            if pending_doc:
+                # Encontrou trabalho! Mãos à obra.
+                process_document(pending_doc.id)
+            else:
+                # Não há trabalho? Dorme 2 segundos e tenta de novo.
+                time.sleep(2)
+                
+        except Exception as e:
+            print(f"⚠️ Erro no ciclo do worker: {e}")
+            time.sleep(5)
+        finally:
+            db.close()
+
 if __name__ == "__main__":
-    # Processar documentos 1, 2 e 3 de uma vez
-    for i in range(1, 4):
-         process_document(i)
+    start_worker()
