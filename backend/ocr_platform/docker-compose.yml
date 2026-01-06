@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: ocr_db
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -29,7 +29,7 @@ services:
       - ./models:/app/models
       - ./data:/app/data
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/ocr_db
+      DATABASE_URL: postgresql://user:password@db:5433/ocr_db
     depends_on:
       - db
 
@@ -47,7 +47,7 @@ services:
       - ./models:/app/models
       - ./data:/app/data
     environment:
-      DATABASE_URL: postgresql://user:password@db:5432/ocr_db
+      DATABASE_URL: postgresql://user:password@db:5433/ocr_db
       PYTHONUNBUFFERED: 1  # Para veres os logs no terminal imediatamente
     depends_on:
       - db
